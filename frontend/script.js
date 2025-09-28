@@ -9,7 +9,7 @@ document.getElementById("get-recommendations").addEventListener("click", async (
     }
 
     try {
-        const response = await fetch("https://your-backend-url/recommend", {
+        const response = await fetch("https://movies-recommendation-uzpq.onrender.com", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
