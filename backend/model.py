@@ -21,4 +21,4 @@ class MovieRecNet(nn.Module):
         x = self.fc4(x)   
         return x
 
-model = MovieRecNet(input_dim)
+# model = MovieRecNet(input_dim)
