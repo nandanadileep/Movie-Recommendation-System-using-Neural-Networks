@@ -10,7 +10,7 @@ from model import MovieRecNet
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-model = MovieRecNet(input_dim=5000)
+model = MovieRecNet(input_dim=5022)
 model.load_state_dict(torch.load("movie_rec_model.pth", map_location=device))
 model.eval()
 
