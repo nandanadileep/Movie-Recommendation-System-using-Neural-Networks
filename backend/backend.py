@@ -11,10 +11,12 @@ from model import MovieRecNet
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 model = MovieRecNet(input_dim=5022)
-model.load_state_dict(torch.load("movie_rec_model.pth", map_location=device))
+model.load_state_dict(torch.load("movie_rec_model.pth", map_location=device, weights_only=True))
 model.eval()
 
 movies = pd.read_csv("movies_clean.csv")
+# Fill NaN values in overview column with empty strings
+movies['overview'] = movies['overview'].fillna('')
 
 with open("tfidf_vectorizer.pkl", "rb") as f:
     tfidf = pickle.load(f)
