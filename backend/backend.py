@@ -48,3 +48,7 @@ def recommend(user_input: UserInput):
     top_k = recommendations.sort_values(by='predicted_score', ascending=False).head(10)
     
     return {"recommendations": top_k[['title','genres','predicted_score']].to_dict(orient='records')}
+
+@app.get("/")
+def read_root():
+    return {"message": "Movie Recommendation API is running", "status": "healthy"}
