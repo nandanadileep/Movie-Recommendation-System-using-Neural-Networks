@@ -4,8 +4,9 @@ import torch
 import pandas as pd
 import pickle
 from typing import List
-from model import MovieRecNet
+from .model import MovieRecNet
 import numpy as np
+import os
 
 # Initialize FastAPI app first
 app = FastAPI(title="Movie Recommendation API")
@@ -27,25 +28,41 @@ def load_resources():
     print("Loading resources...")
     
     # Set device
-    device = torch.device("cpu")  # Force CPU for Render free tier
-    print(f"Using device: {device}")
-    
-    # Load model
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Path to the model file in the same folder as this script
+    MODEL_PATH = os.path.join(os.path.dirname(__file__), "movie_rec_model.pth")
+
+    # Initialize and load model
     model = MovieRecNet(input_dim=5022)
-    model.load_state_dict(torch.load("movie_rec_model.pth", map_location=device, weights_only=True))
+    model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
     model.eval()
     model.to(device)
-    print("Model loaded")
     
     # Load movies
-    movies = pd.read_csv("movies_clean.csv")
-    movies['overview'] = movies['overview'].fillna('')
-    print(f"Loaded {len(movies)} movies")
-    
+
+    CSV_PATH = os.path.join(os.path.dirname(__file__), "movies_clean.csv")
+
+    try:
+        movies_df = pd.read_csv(CSV_PATH)
+        print("Movies data loaded")
+    except FileNotFoundError:
+        print(f"Error loading resources: {CSV_PATH} not found")
+        movies_df = None 
+
     # Load TF-IDF vectorizer
-    with open("tfidf_vectorizer.pkl", "rb") as f:
-        tfidf = pickle.load(f)
-    print("TF-IDF vectorizer loaded")
+    import pickle
+
+    VECTORIZER_PATH = os.path.join(os.path.dirname(__file__), "tfidf_vectorizer.pkl")
+
+    try:
+        with open(VECTORIZER_PATH, "rb") as f:
+            tfidf = pickle.load(f)
+        print("TF-IDF vectorizer loaded")
+    except FileNotFoundError:
+        print(f"Error loading resources: {VECTORIZER_PATH} not found")
+        tfidf = None  
+
     
     # Transform all movie overviews
     X_all = tfidf.transform(movies['overview'])
