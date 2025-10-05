@@ -65,7 +65,7 @@ def load_resources():
 
     
     # Transform all movie overviews
-    X_all = tfidf.transform(movies['overview'])
+    X_all = tfidf.transform(movies_df['overview'])
     print(f"TF-IDF matrix shape: {X_all.shape}")
     
     print("All resources loaded successfully!")
