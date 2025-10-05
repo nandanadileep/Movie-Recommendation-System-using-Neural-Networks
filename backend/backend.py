@@ -1,14 +1,13 @@
-# backend.py
-
-import os
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import torch
 import pandas as pd
 import pickle
-import numpy as np
-from fastapi import FastAPI
-from pydantic import BaseModel
 from typing import List
 from model import MovieRecNet
+import os
+import numpy as np
 
 # -----------------------------
 # Initialize FastAPI app
@@ -16,7 +15,23 @@ from model import MovieRecNet
 app = FastAPI(title="Movie Recommendation API")
 
 # -----------------------------
-# Global variables
+# Enable CORS for frontend
+# -----------------------------
+origins = [
+    "http://localhost:5500",  # Local frontend
+    "*",                       # Allow all origins (for testing, not for production)
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# -----------------------------
+# Global variables for lazy loading
 # -----------------------------
 model = None
 movies = None
@@ -25,65 +40,56 @@ X_all = None
 device = None
 
 # -----------------------------
-# User input model
-# -----------------------------
-class UserInput(BaseModel):
-    favorite_movies: List[str]
-
-# -----------------------------
-# Load resources function
+# Helper function to load resources
 # -----------------------------
 def load_resources():
-    """Lazy load all model and data resources"""
     global model, movies, tfidf, X_all, device
-
     if model is not None:
         return  # Already loaded
 
     print("Loading resources...")
 
-    # Device setup
+    # Set device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Paths
-    BASE_DIR = os.path.dirname(__file__)
-    MODEL_PATH = os.path.join(BASE_DIR, "movie_rec_model.pth")
-    CSV_PATH = os.path.join(BASE_DIR, "movies_clean.csv")
-    VECTORIZER_PATH = os.path.join(BASE_DIR, "tfidf_vectorizer.pkl")
-
     # Load model
+    MODEL_PATH = os.path.join(os.path.dirname(__file__), "movie_rec_model.pth")
     model = MovieRecNet(input_dim=5022)
     model.load_state_dict(torch.load(MODEL_PATH, map_location=device, weights_only=False))
     model.eval()
     model.to(device)
 
     # Load movies CSV
+    CSV_PATH = os.path.join(os.path.dirname(__file__), "movies_clean.csv")
     movies_df = pd.read_csv(CSV_PATH)
     movies_df['overview'] = movies_df['overview'].fillna('')
     movies = movies_df
 
     # Load TF-IDF vectorizer
+    VECTORIZER_PATH = os.path.join(os.path.dirname(__file__), "tfidf_vectorizer.pkl")
     with open(VECTORIZER_PATH, "rb") as f:
         tfidf = pickle.load(f)
 
     # Transform overviews
     X_all = tfidf.transform(movies['overview'])
-
+    print(f"TF-IDF matrix shape: {X_all.shape}")
     print("All resources loaded successfully!")
 
 # -----------------------------
-# Root route
+# Pydantic model for request body
+# -----------------------------
+class UserInput(BaseModel):
+    favorite_movies: List[str]
+
+# -----------------------------
+# Routes
 # -----------------------------
 @app.get("/")
 def read_root():
     return {"message": "Movie Recommendation API is running", "status": "healthy"}
 
-# -----------------------------
-# Health check route
-# -----------------------------
 @app.get("/health")
 def health_check():
-    global model, movies, device
     try:
         load_resources()
         return {
@@ -95,22 +101,17 @@ def health_check():
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
-# -----------------------------
-# Recommendation route
-# -----------------------------
 @app.post("/recommend")
 def recommend(user_input: UserInput):
-    global model, movies, tfidf, X_all, device
     try:
         load_resources()
 
-        # Filter favorite movies present in database
+        # Validate favorite movies
         fav_titles = [m.strip() for m in user_input.favorite_movies if m.strip() in movies['title'].values]
-
         if not fav_titles:
             return {"error": "No valid movies found in database!"}
 
-        # Compute scores in batches
+        # Batch processing to avoid memory issues
         batch_size = 500
         all_scores = []
 
@@ -122,11 +123,11 @@ def recommend(user_input: UserInput):
                 batch_scores = model(X_tensor).cpu().numpy().flatten()
                 all_scores.extend(batch_scores)
 
-        # Add scores to dataframe
+        # Create copy and add scores
         movies_copy = movies.copy()
         movies_copy['predicted_score'] = all_scores
 
-        # Exclude favorite movies and get top 10
+        # Filter out favorites and return top 10
         recommendations = movies_copy[~movies_copy['title'].isin(fav_titles)]
         top_k = recommendations.sort_values(by='predicted_score', ascending=False).head(10)
 
@@ -139,20 +140,11 @@ def recommend(user_input: UserInput):
         return {"error": f"An error occurred: {str(e)}"}
 
 # -----------------------------
-# Startup event to preload resources
+# Startup event
 # -----------------------------
 @app.on_event("startup")
 async def startup_event():
-    global model, movies, tfidf, X_all, device
     try:
         load_resources()
     except Exception as e:
         print(f"Error loading resources on startup: {e}")
-
-# -----------------------------
-# Main entry point for Render
-# -----------------------------
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 10000))
-    uvicorn.run("backend:app", host="0.0.0.0", port=port)
