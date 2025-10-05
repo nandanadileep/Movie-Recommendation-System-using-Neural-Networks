@@ -4,7 +4,7 @@ import torch
 import pandas as pd
 import pickle
 from typing import List
-from .model import MovieRecNet
+from model import MovieRecNet
 import numpy as np
 import os
 
