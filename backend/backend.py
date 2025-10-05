@@ -18,9 +18,11 @@ app = FastAPI(title="Movie Recommendation API")
 # Enable CORS for frontend
 # -----------------------------
 origins = [
-    "http://localhost:5500",  # Local frontend
-    "*",                       # Allow all origins (for testing, not for production)
+    "http://localhost:5500",
+    "https://nandanadileep.github.io",
+    "https://movierecommendationss.onrender.com",
 ]
+
 
 app.add_middleware(
     CORSMiddleware,
