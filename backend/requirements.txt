@@ -1,8 +1,7 @@
 uvicorn==0.30.1
 torch==2.5.0
-Cython<3
-fastapi>=0.111
-pydantic>=2.7
+fastapi==0.115.0
+pydantic==2.9.0
 numpy==1.26.4
 pandas==2.2.2
 scikit-learn==1.5.0
